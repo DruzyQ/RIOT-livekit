@@ -12,27 +12,21 @@ package org.webrtc.audio;
 
 import android.annotation.TargetApi;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.Build;
 import android.os.Process;
-
 import org.webrtc.ThreadUtils;
-
 import javax.annotation.Nullable;
-
 import org.webrtc.Logging;
-
 import java.lang.Thread;
 import java.nio.ByteBuffer;
 import org.webrtc.CalledByNative;
 
 class WebRtcAudioTrack {
   private static final String TAG = "WebRtcAudioTrackExternal";
-
 
   // Default audio data format is PCM 16 bit per sample.
   // Guaranteed to be supported by all devices.
@@ -54,12 +48,6 @@ class WebRtcAudioTrack {
   // By default, WebRTC creates audio tracks with a usage attribute
   // corresponding to voice communications, such as telephony or VoIP.
   private static final int DEFAULT_USAGE = getDefaultUsageAttribute();
-
-  // RejP - SharedPreferences
-  // Adding access to user-configurable audio delay for latency compensation
-  private static final String AUDIO_PREFS_NAME = "com.zeerak.livekit.listener_prefs";
-  private static final String AUDIO_PREFS_DELAY_MS = "audio_latency_ms";
-  // RejP - End SharedPreferences
 
   private static int getDefaultUsageAttribute() {
     if (Build.VERSION.SDK_INT >= 21) {
@@ -103,7 +91,6 @@ class WebRtcAudioTrack {
     }
     catch (UnsatisfiedLinkError e)
     {
-  int gruten = 0;
     }
   };
 
@@ -147,40 +134,42 @@ class WebRtcAudioTrack {
         delayBlocks[i] = ByteBuffer.allocate(sizeInBytes);
       }
 
-      SharedPreferences audioPrefs = context.getSharedPreferences(AUDIO_PREFS_NAME, Context.MODE_PRIVATE);
       // configure read/write pointers
       int delayWriteIdx = 0;
       int delayReadIdx = 0;
       int delayDelta = 0;
-      JavaAudioDeviceModule.delayDirty = true; // force a grab of the delay value
+      boolean isCountingDownAudio = true;
+      boolean isBufferFull = false;
       // RejP - End Delay setup
 
       startOpenSLES(byteBuffer);
       PauseOpenSLIOLoop(false);
 
       while (keepAlive) {
-        if(JavaAudioDeviceModule.delayDirty){
+        if(JavaAudioDeviceModule.isDelayDirty()) {
           // Read the value configured by the user in the app's setup for audio latency compensation
           // Just set the read pointer, don't touch the write pointer to avoid losing existing streamed data
-          final int deltaIdx = Math.min((int)audioPrefs.getLong(AUDIO_PREFS_DELAY_MS, 0), MAX_DELAY_MS) / CALLBACK_BUFFER_SIZE_MS;
+          final int deltaIdx = Math.min((int)JavaAudioDeviceModule.getDelayMs(), MAX_DELAY_MS) / CALLBACK_BUFFER_SIZE_MS;
           final int goalReadIdx = (delayWriteIdx + delayBufferSizeBlocks - deltaIdx) % delayBufferSizeBlocks;
 
-          if (deltaIdx > delayDelta)
-          {
+          if (deltaIdx > delayDelta) {
             //clear the buffers in between if we're going to jump back
-            while (delayReadIdx != goalReadIdx)
-            {
+            while (delayReadIdx != goalReadIdx) {
               delayBlocks[delayReadIdx].clear();
               delayBlocks[delayReadIdx].position(0);
               delayReadIdx = (delayBufferSizeBlocks + delayReadIdx - 1) % delayBufferSizeBlocks;
             }
-          }
-          else
-          {
+          } else {
             delayReadIdx = goalReadIdx;
           }
           delayDelta = deltaIdx;
-          JavaAudioDeviceModule.delayDirty = false;
+          JavaAudioDeviceModule.resetDelayDirty();
+          if (isBufferFull) {
+            isCountingDownAudio = false;
+          }
+          else {
+            isCountingDownAudio = delayReadIdx > delayWriteIdx;
+          }
         }
 
         if (wantsAudioSignal()) {
@@ -211,8 +200,24 @@ class WebRtcAudioTrack {
               byteBuffer.rewind();
               delayBlocks[delayReadIdx].rewind();
 
-              delayWriteIdx = (delayWriteIdx + 1) % delayBufferSizeBlocks;
-              delayReadIdx = (delayReadIdx + 1) % delayBufferSizeBlocks;
+              delayWriteIdx = (delayWriteIdx + 1);
+              if (delayWriteIdx >= delayBufferSizeBlocks) {
+                isBufferFull = true;
+                delayWriteIdx = 0;
+              }
+
+              delayReadIdx = (delayReadIdx + 1);
+
+              if (delayReadIdx >= delayBufferSizeBlocks) {
+                isCountingDownAudio = false;
+                delayReadIdx = 0;
+              }
+
+              if (isCountingDownAudio) {
+                JavaAudioDeviceModule.setSilenceRemainingSeconds((float)(delayBufferSizeBlocks - delayReadIdx) / BUFFERS_PER_SECOND);
+              } else {
+                JavaAudioDeviceModule.setSilenceRemainingSeconds(0f);
+              }
           } catch (Exception e) {
           }
           // RejP - End delay write/read

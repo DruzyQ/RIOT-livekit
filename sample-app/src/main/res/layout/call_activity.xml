@@ -125,6 +125,18 @@
             app:layout_constraintEnd_toEndOf="@id/seekbar_delay"
             app:layout_constraintTop_toBottomOf="@id/seekbar_delay" />
 
+        <com.google.android.material.textview.MaterialTextView
+          android:id="@+id/textCountDown"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="@{@string/n_secs(viewModel.audioCountdown)}"
+          tools:layout_editor_absoluteX="176dp"
+          tools:layout_editor_absoluteY="59dp"
+          app:layout_constraintEnd_toEndOf="parent"
+          app:layout_constraintStart_toStartOf="parent"
+          app:layout_constraintBottom_toTopOf="@id/tv_value_delay"
+          tools:text="0 sec"/>
+
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

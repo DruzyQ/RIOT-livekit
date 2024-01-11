@@ -13,6 +13,8 @@ import com.xwray.groupie.GroupieAdapter
 import com.zeerak.riotlivekit.databinding.CallActivityBinding
 import io.livekit.android.room.track.LocalVideoTrack
 import kotlinx.parcelize.Parcelize
+import org.webrtc.audio.JavaAudioDeviceModule
+import kotlin.concurrent.fixedRateTimer
 
 class CallActivity : AppCompatActivity() {
 
@@ -40,6 +42,10 @@ class CallActivity : AppCompatActivity() {
         binding.viewModel = audioDelayViewModel
 
         setContentView(binding.root)
+
+        fixedRateTimer("audioCountdownTimer", false, 0, 100){
+            binding.textCountDown.post { binding.textCountDown.text = JavaAudioDeviceModule.getSilenceRemainingSeconds().toString()}
+        }
 
         binding.seekbarDelay.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {

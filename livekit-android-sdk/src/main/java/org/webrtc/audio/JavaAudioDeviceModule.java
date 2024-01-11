@@ -22,7 +22,32 @@ import org.webrtc.Logging;
  */
 public class JavaAudioDeviceModule implements AudioDeviceModule {
   private static final String TAG = "JavaAudioDeviceModule";
-  public static volatile boolean delayDirty = false;
+
+  // Delay handling
+  private static volatile boolean _delayDirty = false;
+  private static volatile long _delayMs = 0;
+
+  public static void setDelayMs(long delayMs) {
+    _delayMs = delayMs;
+    _delayDirty = true;
+  }
+  public static long getDelayMs() {
+    return _delayMs;
+  }
+  public static boolean isDelayDirty() {
+    return _delayDirty;
+  }
+  public static void resetDelayDirty() {
+    _delayDirty = false;
+  }
+
+  public static Float getSilenceRemainingSeconds() {
+    return _silenceRemainingSeconds;
+  }
+  public static void setSilenceRemainingSeconds(float silenceSeconds) {
+    _silenceRemainingSeconds = silenceSeconds;
+  }
+  public static volatile float _silenceRemainingSeconds = 0f;
 
   public static Builder builder(Context context) {
     return new Builder(context);

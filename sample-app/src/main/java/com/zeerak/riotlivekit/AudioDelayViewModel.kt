@@ -29,6 +29,9 @@ class AudioDelayViewModel(context : Context) : AndroidViewModel(context.applicat
     private val _delaySec = MutableLiveData(0f)
     val delaySec: LiveData<Float> = _delaySec
 
+    private val _audioCountdown = MutableLiveData(0f)
+    val audioCountdown: LiveData<Float> = _audioCountdown
+
     private var mPreferencesHelper : PreferencesHelper
 
     init {
@@ -39,6 +42,7 @@ class AudioDelayViewModel(context : Context) : AndroidViewModel(context.applicat
     fun setDefaultDelay(delay: Long) {
         _delay.value = delay
         _delaySec.value = delay / 1000f
+        JavaAudioDeviceModule.setDelayMs(delay)
     }
 
     fun updateDelay(view: View, sec: Long) {
@@ -69,7 +73,7 @@ class AudioDelayViewModel(context : Context) : AndroidViewModel(context.applicat
         async = viewModelScope.async {
             Log.d("XDDD", "updatePref: trying ")
             delay(1000)
-            JavaAudioDeviceModule.delayDirty = true
+            JavaAudioDeviceModule.setDelayMs((_delay.value?.toLong() ?: 0L));
             Log.d("XDDD", "updatePref: updated ")
         }
         viewModelScope.launch {
